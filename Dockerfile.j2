@@ -1,0 +1,43 @@
+FROM {{ namespace }}/{{ image_prefix }}base:{{ tag }}
+MAINTAINER {{ maintainer }}
+
+{% import "macros.j2" as macros with context %}
+
+{% block opendaylight_header %}{% endblock %}
+
+{% if base_distro in ['redhat', 'centos', 'oraclelinux'] %}
+
+COPY opendaylight-5-candidate.repo /etc/yum.repos.d/
+
+RUN yum clean all
+
+    {% set opendaylight_packages = [
+       'opendaylight'
+    ] %}
+
+{{ macros.install_packages(opendaylight_packages | customizable("packages")) }}
+
+{% elif base_distro in ['ubuntu', 'debian'] %}
+
+RUN echo "package not yet available for {{ base_distro }}" | /bin/false
+
+{% endif %}
+
+#Do not change order in features,otherwise services won't start
+{% set opendaylight_features = [
+   'odl-aaa-authn',
+   'odl-restconf',
+   'odl-l2switch-switch',
+   'odl-mdsal-apidocs',
+   'odl-mdsal-apidocs',
+   'odl-ovsdb-openstack',
+   'odl-dlux-core'
+] %}
+
+RUN /opt/opendaylight/bin/start clean \
+    && sleep 15 \
+    && /opt/opendaylight/bin/client "feature:install -v {% for feature in opendaylight_features %}{{ feature }}{{ ' ' if not loop.last else '' }}{% endfor %}" \
+    && /opt/opendaylight/bin/stop
+
+{% block opendaylight_footer %}{% endblock %}
+{% block footer %}{% endblock %}
